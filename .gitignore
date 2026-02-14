@@ -1,0 +1,8 @@
+/english/
+/russian/
+/venv/
+/train_ru.jsonl
+/train.jsonl
+/train_sanitized.jsonl
+/val.jsonl
+/train_en.jsonl
