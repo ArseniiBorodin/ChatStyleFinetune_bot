@@ -1,8 +1,11 @@
 /english/
 /russian/
-/venv/
 /train_ru.jsonl
 /train.jsonl
 /train_sanitized.jsonl
 /val.jsonl
 /train_en.jsonl
+/.venv/
+/venv/
+/out_style_lora_phi3/
+

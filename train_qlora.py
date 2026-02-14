@@ -5,7 +5,6 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import LoraConfig
 from trl import SFTTrainer, SFTConfig
 
-#REDACTED_HF_TOKEN
 # =========================
 # 1) Настройки
 # =========================
