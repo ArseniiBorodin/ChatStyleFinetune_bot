@@ -2,7 +2,7 @@ import json
 import re
 from typing import List, Dict, Tuple, Optional
 
-# ===== настройки =====
+# ===== settings =====
 INPUT_FILES = [
     "english/all_chat.txt",
 ]
@@ -14,11 +14,11 @@ SYSTEM = (
     "Answer in the same language as the user. "
 )
 
-ARSENII_NAME = "Arsenii Borodin"   # должно совпадать с именем в txt
+ARSENII_NAME = "Arsenii Borodin"   # must match the name in the txt file
 MAX_CONTEXT_MESSAGES = 8
 MIN_TEXT_CHARS = 1
 
-# формат: [timestamp] Sender: message
+# format: [timestamp] Sender: message
 pattern = re.compile(r"^\[(.*?)\]\s+(.*?):\s+(.*)$")
 
 
@@ -43,7 +43,7 @@ def parse_txt_files(paths: List[str]) -> List[Tuple[str, str]]:
                 if not text or len(text) < MIN_TEXT_CHARS:
                     continue
 
-                # медиа → маркер
+                # media → marker
                 if "image omitted" in text.lower():
                     text = "<IMAGE>"
 
@@ -53,8 +53,8 @@ def parse_txt_files(paths: List[str]) -> List[Tuple[str, str]]:
 
 def build_block_samples(messages: List[Tuple[str, str]]) -> List[Dict]:
     """
-    Делает samples на блоки ответа Arsenii:
-      system + последние MAX_CONTEXT_MESSAGES сообщений + (assistant: слитый блок)
+    Creates samples based on Arsenii reply blocks:
+      system + last MAX_CONTEXT_MESSAGES messages + (assistant: merged block)
     """
     samples: List[Dict] = []
     context: List[Dict[str, str]] = []
@@ -69,17 +69,17 @@ def build_block_samples(messages: List[Tuple[str, str]]) -> List[Dict]:
         if not merged:
             return
 
-        # sample только если в контексте есть user
+        # create sample only if context contains a user message
         if any(x["role"] == "user" for x in context):
             sample_msgs = [{"role": "system", "content": SYSTEM}]
             sample_msgs.extend(context[-MAX_CONTEXT_MESSAGES:])
             sample_msgs.append({"role": "assistant", "content": merged})
             samples.append({"messages": sample_msgs})
 
-        # кладем слитый ответ в контекст одной репликой
+        # add merged reply to context as a single message
         context.append({"role": "assistant", "content": merged})
 
-        # ограничим контекст
+        # limit context size
         if len(context) > MAX_CONTEXT_MESSAGES * 3:
             context[:] = context[-MAX_CONTEXT_MESSAGES:]
 
@@ -89,7 +89,7 @@ def build_block_samples(messages: List[Tuple[str, str]]) -> List[Dict]:
         if role == "assistant":
             assistant_buf.append(text)
         else:
-            # user пришел -> закрываем предыдущий блок ответа Arsenii
+            # user message received -> close previous Arsenii reply block
             flush_assistant()
 
             context.append({"role": "user", "content": text})

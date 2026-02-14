@@ -6,20 +6,20 @@ from peft import LoraConfig
 from trl import SFTTrainer, SFTConfig
 
 # =========================
-# 1) Настройки
+# 1) Settings
 # =========================
-BASE_MODEL = "microsoft/Phi-3-mini-4k-instruct"   # ✅ меньше, чем Mistral 7B
+BASE_MODEL = "microsoft/Phi-3-mini-4k-instruct"   # ✅ smaller than Mistral 7B
 TRAIN_PATH = "train.jsonl"
 VAL_PATH   = "val.jsonl"
 OUT_DIR    = "out_style_lora_phi3"
 
-MAX_SEQ_LEN = 1024     # можно 512 если будет тяжело
+MAX_SEQ_LEN = 1024     # can be 512 if memory is tight
 EPOCHS = 2
 LR = 2e-4
 
 
 # =========================
-# 2) Устройство (Mac MPS / CPU)
+# 2) Device (Mac MPS / CPU)
 # =========================
 use_mps = torch.backends.mps.is_available()
 device_map = {"": "mps"} if use_mps else {"": "cpu"}
@@ -28,7 +28,7 @@ print("✅ Using MPS (Apple Silicon GPU)" if use_mps else "⚠️ Using CPU")
 
 
 # =========================
-# 3) Токенайзер и модель
+# 3) Tokenizer and model
 # =========================
 tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, use_fast=True)
 if tokenizer.pad_token is None:
@@ -49,19 +49,19 @@ except Exception as e:
 
 
 # =========================
-# 4) Авто-подбор target_modules для LoRA
-#    (чтобы работало на разных архитектурах)
+# 4) Auto-select target_modules for LoRA
+#    (so it works across different architectures)
 # =========================
 def pick_lora_targets(m):
     import torch.nn as nn
 
-    # Смотрим все Linear-слои, берём их "короткие" имена (последний сегмент)
+    # Inspect all Linear layers and collect their "short" names (last segment)
     short_names = set()
     for name, module in m.named_modules():
         if isinstance(module, nn.Linear):
             short_names.add(name.split(".")[-1])
 
-    # Предпочтительные имена (часто встречаются)
+    # Preferred names (commonly used in transformer architectures)
     preferred = [
         "q_proj", "k_proj", "v_proj", "o_proj",
         "gate_proj", "up_proj", "down_proj",
@@ -70,7 +70,7 @@ def pick_lora_targets(m):
 
     targets = [x for x in preferred if x in short_names]
 
-    # Если ничего не нашли — берём все линейные (но это может быть тяжелее)
+    # If nothing found — fall back to all Linear layers (may be heavier)
     if not targets:
         targets = sorted(short_names)
 
@@ -89,18 +89,18 @@ peft_config = LoraConfig(
 
 
 # =========================
-# 5) Датасет
+# 5) Dataset
 # =========================
 ds = load_dataset("json", data_files={"train": TRAIN_PATH, "validation": VAL_PATH})
 
 def formatting_func(example):
     msgs = example["messages"]
-    # Для SFT: шаблон + уже готовый assistant-ответ внутри сообщений
+    # For SFT: template + already prepared assistant response inside messages
     return tokenizer.apply_chat_template(msgs, tokenize=False, add_generation_prompt=False)
 
 
 # =========================
-# 6) Конфиг обучения
+# 6) Training configuration
 # =========================
 cfg = SFTConfig(
     output_dir=OUT_DIR,

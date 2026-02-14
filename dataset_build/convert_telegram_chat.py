@@ -4,17 +4,17 @@ from typing import Any, Dict, List, Optional, Union
 
 
 SYSTEM = (
-    "Ты отвечаешь в стиле переписки Arsenii. "
-    "Отвечай по смыслу и используй контекст. "
-    "Отвечай на том же языке, на котором тебе пишут."
+    "You reply in Arsenii's messaging style. "
+    "Respond based on meaning and use context. "
+    "Reply in the same language you are addressed in."
 )
 
-# Arsenii = assistant, все остальные = user (могут меняться)
-ARSENII_FROM_IDS = {"user750091526"}  # добавь сюда другие from_id Arsenii, если есть
+# Arsenii = assistant, everyone else = user (may vary)
+ARSENII_FROM_IDS = {"user750091526"}  # add other Arsenii from_id values here if needed
 ARSENII_FROM_NAMES = {"Arsenii Börodin", "Arsenii Borodin", "Arsenii Börodin"}
 
-# Контекст
-MAX_CONTEXT_MESSAGES = 8   # сколько последних сообщений (без system) давать в пример
+# Context
+MAX_CONTEXT_MESSAGES = 8   # how many last messages (excluding system) to include in the sample
 MIN_TEXT_CHARS = 1
 
 
@@ -59,7 +59,7 @@ def load_one_or_many_json(path: Union[str, Path]) -> List[Dict[str, Any]]:
     if not raw:
         return []
 
-    # 1) обычный JSON (объект или массив)
+    # 1) regular JSON (object or array)
     try:
         data = json.loads(raw)
         if isinstance(data, dict):
@@ -69,7 +69,7 @@ def load_one_or_many_json(path: Union[str, Path]) -> List[Dict[str, Any]]:
     except json.JSONDecodeError:
         pass
 
-    # 2) NDJSON: по одному JSON-объекту на строку
+    # 2) NDJSON: one JSON object per line
     out: List[Dict[str, Any]] = []
     for line in raw.splitlines():
         line = line.strip()
@@ -88,14 +88,14 @@ def build_context_samples_from_chat(chat_obj: Dict[str, Any]) -> List[Dict[str, 
     msgs = chat_obj.get("messages", [])
     samples: List[Dict[str, Any]] = []
 
-    # контекст — последние сообщения (user/assistant), но без system
+    # context — recent messages (user/assistant), excluding system
     context: List[Dict[str, str]] = []
 
-    # буфер для склейки ответов Arsenii
+    # buffer for merging consecutive Arsenii replies
     assistant_buf: List[str] = []
 
     def flush_assistant_buf():
-        """Закрываем блок ответа Arsenii: создаём один sample и кладём слитый ответ в контекст."""
+        """Close Arsenii's reply block: create one sample and add the merged reply to context."""
         nonlocal assistant_buf, context, samples
         if not assistant_buf:
             return
@@ -105,17 +105,17 @@ def build_context_samples_from_chat(chat_obj: Dict[str, Any]) -> List[Dict[str, 
         if not merged:
             return
 
-        # создаём sample только если в контексте есть user (иначе нечему отвечать)
+        # create sample only if context contains a user message (otherwise nothing to reply to)
         if any(x["role"] == "user" for x in context):
             sample_msgs = [{"role": "system", "content": SYSTEM}]
             sample_msgs.extend(context[-MAX_CONTEXT_MESSAGES:])
             sample_msgs.append({"role": "assistant", "content": merged})
             samples.append({"messages": sample_msgs})
 
-        # добавляем слитый ответ в контекст одной репликой
+        # add merged reply to context as a single message
         context.append({"role": "assistant", "content": merged})
 
-        # ограничиваем контекст
+        # limit context size
         if len(context) > MAX_CONTEXT_MESSAGES * 3:
             context[:] = context[-MAX_CONTEXT_MESSAGES:]
 
@@ -135,21 +135,21 @@ def build_context_samples_from_chat(chat_obj: Dict[str, Any]) -> List[Dict[str, 
         role = "assistant" if is_arsenii(m) else "user"
 
         if role == "assistant":
-            # если ассистент продолжает писать — копим в буфер
+            # if assistant continues writing — accumulate in buffer
             assistant_buf.append(text)
             last_role = "assistant"
         else:
-            # пришёл user -> сначала закрываем предыдущий ответ Arsenii (если он был)
+            # user message received -> first close previous Arsenii reply (if any)
             flush_assistant_buf()
 
-            # кладём user-сообщение в контекст
+            # add user message to context
             context.append({"role": "user", "content": text})
             last_role = "user"
 
             if len(context) > MAX_CONTEXT_MESSAGES * 3:
                 context[:] = context[-MAX_CONTEXT_MESSAGES:]
 
-    # закрываем буфер в конце
+    # flush buffer at the end
     flush_assistant_buf()
 
     return samples
